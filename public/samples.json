@@ -1,0 +1,18 @@
+{
+  "source": {
+    "label": "Synthetic examples",
+    "date": "2026-11-12",
+    "count": 8,
+    "note": "Invented addresses on reserved example domains. No customer data or expected fraud verdicts. These inputs do not establish model accuracy."
+  },
+  "emails": [
+    "alex@example.com",
+    "support@example.org",
+    "team+signup@example.com",
+    "first.last@example.net",
+    "a.b.c.d.e@example.com",
+    "signup123456@example.org",
+    "a8f03b92c71d@example.net",
+    "not-an-email"
+  ]
+}

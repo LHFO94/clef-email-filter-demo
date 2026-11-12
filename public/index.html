@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Test Clef on the existing ConfirmEmail endpoint and inspect the predictions actually received by a private diagnostic backend.">
+  <title>ConfirmEmail · Clef request lab</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23242627'/%3E%3Cpath d='M9 10h14M9 16h10M9 22h14' stroke='%23ed743b' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#emails">Skip to email input</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#" aria-label="Cloudflare Clef request lab">
+        <span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="brand-cloudflare">Cloudflare</span><span class="brand-cross" aria-hidden="true">×</span><span class="brand-partner">Clef email demo</span>
+      </a>
+      <span class="mode-pill">Private diagnostic demo</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="integration" aria-labelledby="page-title">
+      <div class="page-heading"><div><p class="eyebrow">Existing endpoint · inline Clef</p><h1 id="page-title">See what the backend received.</h1></div><code class="endpoint">POST /AccountV2/ConfirmEmail</code></div>
+      <figure class="architecture">
+        <figcaption><strong>One request, end to end</strong><span>Clef runs before the backend receives the request.</span></figcaption>
+        <div class="architecture-scroll" tabindex="0" role="region" aria-label="Request sequence diagram. Scroll horizontally on small screens.">
+          <svg class="architecture-diagram" viewBox="0 0 1000 350" role="img" aria-labelledby="flow-title flow-description">
+            <title id="flow-title">Existing endpoint with inline Clef predictions</title>
+            <desc id="flow-description">The app posts to its existing endpoint. A Worker Route intercepts the request, creates a pending D1 record, calls Clef, and commits the result to D1. Only then does it forward the original body and path with Clef prediction headers to the backend. The backend response returns through the Worker. There is no browser redirect. This demo uses a diagnostic backend, not the customer backend.</desc>
+            <defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
+            <g class="diagram-lifelines"><path d="M90 65V330 M300 65V330 M500 65V245 M690 65V245 M910 65V330"/></g>
+            <g class="diagram-actors">
+              <rect x="20" y="14" width="140" height="46" rx="3"/><rect class="diagram-worker" x="230" y="14" width="140" height="46" rx="3"/>
+              <rect x="430" y="14" width="140" height="46" rx="3"/><rect x="620" y="14" width="140" height="46" rx="3"/><rect x="840" y="14" width="140" height="46" rx="3"/>
+            </g>
+            <g class="diagram-titles" text-anchor="middle"><text x="90" y="34">Existing app</text><text x="300" y="34">Worker Route</text><text x="500" y="34">Clef</text><text x="690" y="34">D1</text><text x="910" y="34">Backend</text></g>
+            <g class="diagram-subtitles" text-anchor="middle"><text x="90" y="49">Same endpoint</text><text x="300" y="49">Intercept + enrich</text><text x="500" y="49">Workers AI</text><text x="690" y="49">Decision record</text><text x="910" y="49">Diagnostic in this demo</text></g>
+            <g class="diagram-arrows" marker-end="url(#flow-arrow)"><path d="M90 100H300"/><path d="M300 138H690"/><path d="M300 176H500"/><path d="M500 214H300"/><path d="M300 252H690"/><path d="M300 290H910"/><path class="diagram-response" d="M910 328H300 M300 328H90"/></g>
+            <g class="diagram-labels"><text x="105" y="91">1 · POST original request</text><text x="315" y="129">2 · Save pending record</text><text x="315" y="167">3 · Classify email</text><text x="315" y="205">4 · Return predictions</text><text x="315" y="243">5 · Commit result before forwarding</text><text x="315" y="281">6 · Same body + path, with X-Clef-* request headers</text><text x="105" y="319">7 · Backend response via Worker · no redirect</text></g>
+          </svg>
+        </div>
+        <p class="diagram-scroll-hint">Scroll the diagram to see the full request flow →</p>
+      </figure>
+      <p class="route-note"><strong>Production setup:</strong> DNS must be proxied; route <code>&lt;existing-api-host&gt;/AccountV2/ConfirmEmail*</code>; the Worker checks the exact path + POST.</p>
+      <p class="demo-note"><strong>This demo:</strong> <span id="demo-host">this private hostname</span> uses a diagnostic backend that echoes received predictions and creates no accounts. The customer backend is not configured or verified. The demo-only <code>X-Clef-Demo: 1</code> header requests the inspection envelope.</p>
+    </section>
+
+    <section class="lab" id="lab" aria-labelledby="lab-title">
+      <div class="section-heading"><h2 id="lab-title">Test an email. Inspect the response.</h2><span class="section-meta"><span class="live-dot" aria-hidden="true"></span> Real requests · no retries</span></div>
+      <div class="lab-layout">
+        <aside class="composer">
+          <form id="email-form" novalidate>
+            <div class="composer-heading"><label for="emails">Email inputs</label><span id="input-count" class="mono micro">0 / 50</span></div>
+            <p class="field-description" id="email-help">One per line, up to 50. Each POST sends <code>{"email":"…"}</code>; invalid inputs exercise extraction skips.</p>
+            <textarea id="emails" name="emails" rows="9" spellcheck="false" autocapitalize="none" autocomplete="off" autocorrect="off" aria-describedby="email-help input-error" placeholder="Enter your own emails or load a sample set."></textarea>
+            <p class="input-error" id="input-error" role="alert" hidden></p>
+            <div class="sample-actions" aria-label="Load email examples">
+              <button type="button" class="text-button" id="sample-customer" disabled>Synthetic examples</button>
+              <button type="button" class="text-button" id="sample-controls">Controls</button>
+              <button type="button" class="text-button" id="sample-invalid">Invalid</button>
+            </div>
+            <p class="sample-status" id="sample-status" role="status">Loading synthetic examples…</p>
+            <p id="sample-load-error" class="input-error" role="alert" hidden></p>
+            <button class="button button-primary" id="run-button" type="submit"><span id="run-label">Run requests</span><span aria-hidden="true">→</span></button>
+            <button class="button button-stop" id="stop-button" type="button" hidden>Stop after current request</button>
+            <p class="run-note">Sequential calls. Stopping lets the current request finish.</p>
+          </form>
+        </aside>
+
+        <div class="observations">
+          <div class="run-status">
+            <div class="run-status-top"><span class="eyebrow">Live results</span><button type="button" class="text-button" id="clear-button" disabled>Clear results</button></div>
+            <p id="run-message" role="status" aria-live="polite" aria-atomic="true">No requests sent yet.</p>
+            <div class="progress-row"><progress id="batch-progress" max="1" value="0" aria-label="Requests settled"></progress><span class="mono micro" id="progress-label">0 / 0</span></div>
+          </div>
+
+          <section class="results-panel" aria-labelledby="results-title">
+            <div class="panel-header"><h3 id="results-title">Every input</h3><span class="mono micro" id="result-count">0</span></div>
+            <div class="list-empty" id="list-empty"><p>Your results will appear here.</p><span>Use a synthetic example, a control, or your own address.</span></div>
+            <div class="table-scroll" id="results-table" tabindex="0" role="region" aria-label="All request results; scroll to view every row" hidden>
+              <table class="results-table">
+                <caption class="visually-hidden">Select an email to inspect its actual backend response. Delivery is confirmed only by backend evidence.</caption>
+                <thead><tr><th scope="col">Email / inspect</th><th scope="col">Clef verdict</th><th scope="col">Suspicious</th><th scope="col">Clef time</th><th scope="col">Backend HTTP</th><th scope="col">Prediction delivery</th></tr></thead>
+                <tbody id="request-list"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="inspector" aria-labelledby="inspector-title">
+            <div class="panel-header"><h3 id="inspector-title">Actual backend response</h3><span class="micro mono">DIAGNOSTIC BACKEND</span></div>
+            <p class="inspector-empty" id="inspector-empty">Run a request, then select an email to see what arrived at the backend.</p>
+            <div id="inspection" hidden>
+              <div class="inspection-heading"><div><p class="detail-email" id="detail-email"></p><p class="detail-outcome"><strong id="detail-verdict"></strong><span id="detail-backend-status"></span></p></div><span class="delivery-badge" id="detail-delivery"></span></div>
+              <p class="detail-warning" id="detail-warning" role="status" hidden></p>
+              <div class="received-probabilities" aria-labelledby="received-title"><h4 id="received-title">Probabilities received by backend</h4><dl><div><dt>Likely legitimate</dt><dd id="received-legitimate">—</dd></div><div><dt>Suspicious</dt><dd id="received-suspicious">—</dd></div><div><dt>Insufficient evidence</dt><dd id="received-insufficient">—</dd></div></dl></div>
+              <pre id="backend-response" tabindex="0" aria-label="Actual diagnostic backend JSON response">No backend response received.</pre>
+              <details class="technical-details" id="technical-disclosure">
+                <summary>Technical details <span aria-hidden="true">+</span></summary>
+                <dl class="evidence-grid">
+                  <div><dt>Input source</dt><dd id="detail-source">—</dd></div>
+                  <div><dt>Clef status / error</dt><dd id="record-status">—</dd></div>
+                  <div><dt>Model confidence</dt><dd id="detail-confidence">—</dd></div>
+                  <div><dt>Model / policy</dt><dd id="record-model">—</dd></div>
+                  <div><dt>Server / browser duration</dt><dd id="request-timing">—</dd></div>
+                  <div><dt>Request ID</dt><dd id="request-id">—</dd></div>
+                  <div><dt>Ray ID</dt><dd id="ray-id">—</dd></div>
+                  <div><dt>Original method / path</dt><dd id="request-route">—</dd></div>
+                  <div><dt>Original content type</dt><dd id="request-content-type">—</dd></div>
+                  <div><dt>Original body / bytes</dt><dd id="request-body">—</dd></div>
+                  <div><dt>Original body SHA-256</dt><dd id="request-hash">—</dd></div>
+                  <div><dt>Body / method / path / content type preserved</dt><dd id="request-preserved">—</dd></div>
+                  <div><dt>Prediction comparison</dt><dd id="prediction-comparison">—</dd></div>
+                  <div><dt>Optional transform marker</dt><dd id="transform-marker">—</dd></div>
+                  <div><dt>Browser redirected / backend Location</dt><dd id="request-redirect">—</dd></div>
+                </dl>
+                <h4>Clef fields received from request headers</h4><pre id="received-clef" tabindex="0" aria-label="Clef fields received by backend">Not reported.</pre>
+                <h4>Full inspection envelope</h4><pre id="raw-response" tabindex="0" aria-label="Full API JSON response">No response received.</pre>
+              </details>
+            </div>
+          </section>
+        </div>
+      </div>
+      <noscript><p class="noscript-warning">JavaScript is required to send requests and inspect results. No requests are sent without it.</p></noscript>
+    </section>
+    <p class="privacy-note"><strong>Advisory only.</strong> Examples are not verified fraud or expected verdicts. Workers AI receives the email; D1 stores its HMAC and decision metadata, not the raw email. Inputs and responses stay in page memory, never browser storage. Avoid sensitive data.</p>
+  </main>
+
+  <footer class="footer"><div class="footer-inner"><span>Cloudflare Clef / ConfirmEmail demo</span><nav aria-label="Official product references"><a href="https://developers.cloudflare.com/workers-ai/models/clef/" target="_blank" rel="noopener noreferrer">Clef ↗</a><a href="https://developers.cloudflare.com/d1/" target="_blank" rel="noopener noreferrer">D1 ↗</a><a href="https://developers.cloudflare.com/workers/configuration/routing/routes/" target="_blank" rel="noopener noreferrer">Worker Routes ↗</a></nav></div></footer>
+</body>
+</html>

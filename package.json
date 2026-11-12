@@ -1,0 +1,20 @@
+{
+  "name": "clef-signup-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test",
+    "smoke": "node scripts/smoke.mjs",
+    "test:emails": "node scripts/probe-emails.mjs",
+    "access": "node scripts/configure-access.mjs",
+    "deploy": "npm run access && wrangler deploy && npm run access",
+    "deploy:origin": "wrangler deploy --config wrangler.origin.jsonc",
+    "db:migrate": "wrangler d1 migrations apply clef-signup-classifications --remote",
+    "records": "wrangler d1 execute clef-signup-classifications --remote --command \"SELECT id, created_at, path, status, verdict, confidence, inference_ms, error_code FROM classifications ORDER BY created_at DESC LIMIT 20\""
+  },
+  "devDependencies": {
+    "wrangler": "4.112.0"
+  }
+}
